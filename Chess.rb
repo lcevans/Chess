@@ -243,7 +243,10 @@ class Board
   end
 
   def display
+    print "    a  b  c  d  e  f  g  h "
+    puts ""
     (0..7).each do |x|
+      print " #{8-x} "
       (0..7).each do |y|
         if @tiles[x][y] == nil
           print "   "
@@ -257,8 +260,37 @@ class Board
 
 end
 
-board = Board.new
-board.move([6,5], [5,5])
-board.move([1,4], [3,4])
-board.move([6,6], [4,6])
-board.move([0,3], [4,7])
+class Game
+  def initialize
+    @board = Board.new
+  end
+
+  def play
+    while
+      @board.display
+      puts "Enter move in this format: e4 f6"
+      input = gets.scan(/\w+/)
+      old_pos, new_pos = input.map { |algebraic_coords| convert_move(algebraic_coords) }
+      p [old_pos, new_pos]
+      @board.move(old_pos, new_pos)
+    end
+  end
+
+  def convert_move(coords)
+    letter, num = coords[0], coords[1]
+    [8 - num.to_i, "abcdefgh".index(letter)]
+  end
+end
+
+if __FILE__ == $0
+  game = Game.new
+  game.play
+end
+
+
+
+# board = Board.new
+# board.move([6,5], [5,5])
+# board.move([1,4], [3,4])
+# board.move([6,6], [4,6])
+# board.move([0,3], [4,7])
