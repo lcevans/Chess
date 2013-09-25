@@ -1,5 +1,6 @@
 # encoding: utf-8
 
+require 'colorize'
 
 class Array
   def vector_add(vector)
@@ -242,6 +243,42 @@ class Board
     true
   end
 
+  def check_pawn_promotion(color)
+    color == :black ? end_row = 7 : end_row = 0
+    colored_pieces(color).detect do |piece|
+      piece.location.first == end_row && piece.is_a?(Pawn)
+    end
+  end
+
+  def promote_pawn(pawn, piece_to_promote)
+    valid_pieces = ["queen", "bishop", "rook", "knight"]
+    x,y = pawn.location
+    color = pawn.color
+    case piece_to_promote
+    when "queen"
+      @tiles[x][y] = Queen.new([x,y], color)
+    when "bishop"
+      @tiles[x][y] = Bishop.new([x,y], color)
+    when "rook"
+      @tiles[x][y] = Rook.new([x,y], color)
+    when "knight"
+      @tiles[x][y] = Knight.new([x,y], color)
+    else
+      raise ArgumentError.new "Not a valid piece"
+    end
+  end
+end
+
+class Game
+
+  attr_accessor :board
+
+  def initialize(player1, player2)
+    @player1 = player1
+    @player2 = player2
+    @board = Board.new
+  end
+
   def display
     puts `clear`
     print "    a  b  c  d  e  f  g  h "
@@ -249,46 +286,58 @@ class Board
     (0..7).each do |x|
       print " #{8-x} "
       (0..7).each do |y|
-        if @tiles[x][y] == nil
-          print "   "
+        (x + y).even? ? background_color = :white : background_color = :red
+        if @board.tiles[x][y] == nil
+          print "   ".colorize(:background => background_color)
         else
-          print " #{@tiles[x][y].to_s} "
+          print " #{@board.tiles[x][y].to_s} ".colorize(:color => :black, :background => background_color)
         end
       end
       puts ""
     end
   end
 
-end
-
-class Game
-  def initialize(player1, player2)
-    @player1 = player1
-    @player2 = player2
-    @board = Board.new
-  end
-
   def play
     current_color = :white
 
     until @board.in_checkmate?(current_color)
-      @board.display
+      display
       puts "It's #{current_color}'s turn to play"
-      begin
-        old_pos, new_pos = @player1.get_move
-        @board.move(old_pos, new_pos, current_color)
-      rescue ArgumentError => e
-        puts "*********#{e.message}*********"
-        retry
-      end
+
+      get_player_move(current_color)
+      handle_pawn_promotion(current_color)
+
       current_color == :white ? current_color = :black : current_color = :white
     end
 
     display_outcome(current_color)
   end
 
+  def handle_pawn_promotion(color)
+    pawn = @board.check_pawn_promotion(color)
+    unless pawn.nil?
+      begin
+        new_piece_type = @player1.decide_promotion
+        @board.promote_pawn(pawn, new_piece_type)
+      rescue ArgumentError => e
+        puts "*********#{e.message}*********"
+        retry
+      end
+    end
+  end
+
+  def get_player_move(current_color)
+    begin
+      old_pos, new_pos = @player1.get_move
+      @board.move(old_pos, new_pos, current_color)
+    rescue ArgumentError => e
+      puts "*********#{e.message}*********"
+      retry
+    end
+  end
+
   def display_outcome(losing_color)
-    @board.display
+    display
     puts "Game over, #{losing_color} loses!"
   end
 
@@ -302,9 +351,19 @@ class HumanPlayer
 
   def get_move
     puts "Enter move in this format: e4 f6"
-    input = gets.scan(/\w+/)
-    input.map { |algebraic_coords| convert_move(algebraic_coords) }
+    input = gets.strip
+    raise ArgumentError.new "Invalid input" unless /^[a-h][1-8] [a-h][1-8]$/ =~ input
+    input.split(" ").map { |algebraic_coords| convert_move(algebraic_coords) }
   end
+
+  def decide_promotion
+    puts "What do you want to promote your pawn to (Rook, Queen, Bishop, Knight)"
+    gets.chomp.downcase
+  end
+
+  # def get_move
+  #
+  # end
 
   def convert_move(coords)
     letter, num = coords[0], coords[1]
