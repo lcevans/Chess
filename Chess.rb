@@ -89,6 +89,8 @@ class Game
     display
     if @board.in_checkmate?(@current_player.color)
       puts "Game over, #{@current_player.color} loses!"
+    elsif @board.in_stalemate?(@current_player.color)
+      puts "It's a stalemate!"
     else
       puts "It's a draw!"
     end
@@ -133,9 +135,31 @@ class ComputerPlayer
   attr_accessor :name, :color
   def initialize(name = "Commodore 64")
     @name = name
+    #piece_values = {:queen => 9, :rook => 5, :bishop => 4, :knight => 3, :pawn => 1}
   end
 
   def get_move(board)
+    pieces = board.colored_pieces(@color)
+    uninhibited_moves = []
+    pieces.each do |piece|
+      piece.uninhibited_moves(board).each do |destination|
+        uninhibited_moves << [piece.location,destination]
+      end
+    end
+
+    capturing_moves = uninhibited_moves.select do |departure,destination|
+      board.valid_move?(departure,destination) && board.get_tile(destination)
+    end
+
+
+    if !capturing_moves.empty?
+      capturing_moves.sample
+    else
+      random_move(board)
+    end
+  end
+
+  def random_move(board)
     piece = board.colored_pieces(@color).sample
     old_pos = piece.location
     new_pos = piece.uninhibited_moves(board).sample
@@ -149,8 +173,13 @@ class ComputerPlayer
 end
 
 if __FILE__ == $0
-  game = Game.new(ComputerPlayer.new, ComputerPlayer.new)
-  game.play
+  5.times do
+    game = Game.new(ComputerPlayer.new, ComputerPlayer.new)
+    game.play
+    sleep 0.5
+  end
+
+  puts "A strange game. The only winning move is not to play."
 end
 
 # board = Board.new
