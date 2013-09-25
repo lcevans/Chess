@@ -44,7 +44,7 @@ class Game
   def play
     current_color = @current_player.color
 
-    until @board.in_checkmate?(current_color)
+    until @board.is_over?(current_color)
       display
       puts "It's #{current_color}'s turn to play"
 
@@ -87,7 +87,11 @@ class Game
 
   def display_outcome
     display
-    puts "Game over, #{@current_player.color} loses!"
+    if @board.in_checkmate?(@current_player.color)
+      puts "Game over, #{@current_player.color} loses!"
+    else
+      puts "It's a draw!"
+    end
   end
 
   def check_input_is_castle(king_pos,rook_pos,current_color)

@@ -19,6 +19,7 @@ class Board
 
   def initialize
     @tiles = build_starting_board
+    @moves_since_capture = 0
   end
 
   def build_starting_board
@@ -81,6 +82,8 @@ class Board
     x2, y2 = new_pos
     piece = @tiles[x1][y1]
     piece.has_moved = true if piece.is_a?(King) || piece.is_a?(Rook)
+    former_occupant = @tiles[x2][y2]
+    if former_occupant then @moves_since_capture = 0 else @moves_since_capture += 1 end
 
     @tiles[x2][y2] = piece
     piece.location = [x2, y2]
@@ -111,7 +114,15 @@ class Board
     @tiles.flatten.compact.select{|piece| piece.color == color}
   end
 
+  def is_over?(color)
+    in_stalemate?(color) || @moves_since_capture > 50
+  end
+
   def in_checkmate?(color)
+    in_stalemate?(color) && in_check?(color)
+  end
+
+  def in_stalemate?(color)
     colored_pieces(color).each do |piece|
       piece.uninhibited_moves(self).each do |move|
         return false if valid_move?(piece.location, move)
