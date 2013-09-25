@@ -16,7 +16,10 @@ class Game
 
   def initialize(player1, player2)
     @player1 = player1
+    player1.color = :white
     @player2 = player2
+    player2.color = :black
+    @current_player = @player1
     @board = Board.new
   end
 
@@ -39,7 +42,7 @@ class Game
   end
 
   def play
-    current_color = :white
+    current_color = @current_player.color
 
     until @board.in_checkmate?(current_color)
       display
@@ -48,17 +51,18 @@ class Game
       get_player_move(current_color)
       handle_pawn_promotion(current_color)
 
-      current_color == :white ? current_color = :black : current_color = :white
+      @current_player == @player1 ? @current_player = @player2 : @current_player = @player1
+      current_color = @current_player.color
     end
 
-    display_outcome(current_color)
+    display_outcome
   end
 
   def handle_pawn_promotion(color)
     pawn = @board.check_pawn_promotion(color)
     unless pawn.nil?
       begin
-        new_piece_type = @player1.decide_promotion
+        new_piece_type = @current_player.decide_promotion
         @board.promote_pawn(pawn, new_piece_type)
       rescue ArgumentError => e
         puts "*********#{e.message}*********"
@@ -69,21 +73,21 @@ class Game
 
   def get_player_move(current_color)
     begin
-      old_pos, new_pos = @player1.get_move
+      old_pos, new_pos = @current_player.get_move(@board)
       if check_input_is_castle(old_pos,new_pos,current_color)
         @board.castle_move(old_pos, new_pos, current_color)
       else
         @board.move(old_pos, new_pos, current_color)
       end
     rescue ArgumentError => e
-      puts "*********#{e.message}*********"
+      puts "*********#{e.message}*********" if @current_player.is_a?(HumanPlayer)
       retry
     end
   end
 
-  def display_outcome(losing_color)
+  def display_outcome
     display
-    puts "Game over, #{losing_color} loses!"
+    puts "Game over, #{@current_player.color} loses!"
   end
 
   def check_input_is_castle(king_pos,rook_pos,current_color)
@@ -98,12 +102,12 @@ class Game
 end
 
 class HumanPlayer
-  attr_reader :name
-  def initialize(name)
+  attr_accessor :name, :color
+  def initialize(name = "Fleshbag")
     @name = name
   end
 
-  def get_move
+  def get_move(board)
     puts "Enter move in this format: e4 f6"
     input = gets.strip
     raise ArgumentError.new "Invalid input" unless /^[a-h][1-8] [a-h][1-8]$/ =~ input
@@ -115,18 +119,33 @@ class HumanPlayer
     gets.chomp.downcase
   end
 
-  # def get_move
-  #
-  # end
-
   def convert_move(coords)
     letter, num = coords[0], coords[1]
     [8 - num.to_i, "abcdefgh".index(letter)]
   end
 end
 
+class ComputerPlayer
+  attr_accessor :name, :color
+  def initialize(name = "Commodore 64")
+    @name = name
+  end
+
+  def get_move(board)
+    piece = board.colored_pieces(@color).sample
+    old_pos = piece.location
+    new_pos = piece.uninhibited_moves(board).sample
+    [old_pos,new_pos]
+  end
+
+  def decide_promotion
+    "queen"
+  end
+
+end
+
 if __FILE__ == $0
-  game = Game.new(HumanPlayer.new("Player1"), HumanPlayer.new("Player2"))
+  game = Game.new(ComputerPlayer.new, ComputerPlayer.new)
   game.play
 end
 
