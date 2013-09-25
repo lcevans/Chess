@@ -1,271 +1,12 @@
 # encoding: utf-8
 
 require 'colorize'
+require './board.rb'
+require './piece.rb'
 
 class Array
   def vector_add(vector)
     self.zip(vector).map{|x,y| x + y}
-  end
-end
-
-class Piece
-  attr_accessor :location, :color
-
-  def initialize(location, color)
-    @location = location
-    @color = color
-  end
-
-end
-
-class SteppingPiece < Piece
-  def uninhibited_moves(board)
-    locations = move_displacements.map { |displacement| @location.vector_add(displacement) }
-    locations.select { |position| board.open_space?(position, @color) }
-  end
-end
-
-class Knight < SteppingPiece
-  def to_s
-    @color == :white ? "♘" : "♞"
-  end
-
-  def move_displacements
-    move_displacements = []
-    [-2, -1, 1, 2].each do |delta_x|
-      [-2, -1, 1, 2].each do |delta_y|
-        move_displacements << [delta_x, delta_y] if (delta_x + delta_y).odd?
-      end
-    end
-    move_displacements
-  end
-end
-
-class King < SteppingPiece
-  def to_s
-  @color == :white ? "♔" : "♚"
-  end
-
-  def move_displacements
-    move_displacements = []
-    [-1, 0, +1].each do |delta_x|
-      [-1, 0, +1].each do |delta_y|
-        next if delta_x == 0 && delta_y == 0
-        move_displacements << [delta_x, delta_y]
-      end
-    end
-    move_displacements
-  end
-end
-
-class SlidingPiece < Piece
-  def uninhibited_moves(board)
-    dirs, moves = move_dirs, []
-
-    dirs.each do |displacement|
-      test_pos = @location
-      test_pos = test_pos.vector_add(displacement)
-      while board.empty_space?(test_pos)
-        moves << test_pos
-        test_pos = test_pos.vector_add(displacement)
-      end
-      #If it's an enemy color piece, take it
-      moves << test_pos if board.open_space?(test_pos, @color)
-    end
-    moves
-  end
-end
-
-class Queen < SlidingPiece
-  def to_s
-  @color == :white ? "♕" : "♛"
-  end
-
-  def move_dirs
-    moves = [[0,1], [1,0], [-1, 0], [0, -1], [-1,1], [1,1], [1,-1], [-1,-1]]
-  end
-end
-
-class Bishop < SlidingPiece
-  def to_s
-  @color == :white ? "♗" : "♝"
-  end
-
-  def move_dirs
-    moves = [[1,1], [1,-1], [-1, -1], [-1, 1]]
-  end
-end
-
-class Rook < SlidingPiece
-  def to_s
-  @color == :white ? "♖" : "♜"
-  end
-
-  def move_dirs
-    moves = [[0,1], [1,0], [-1, 0], [0, -1]]
-  end
-
-end
-
-class Pawn < Piece
-  def to_s
-  @color == :white ? "♙" : "♟"
-  end
-
-  def uninhibited_moves(board)
-    # move_displacements = [[-1,1],[0,1],[1,1]]
-    # move_displacements.map! {|x,y| [-x,-y]} if @color == :black
-    moves = []
-
-    @color == :black ? simple_disp = [1,0] : simple_disp = [-1, 0]
-    simple_move = simple_disp.vector_add(@location)
-    if board.empty_space?(simple_move)
-      moves << simple_move
-    end
-
-    @color == :black ? home_row = 1 : home_row = 6
-    if @location[0] == home_row
-      @color == :black ? double_disp = [2,0] : double_disp = [-2,0]
-      double_move = double_disp.vector_add(@location)
-      if board.empty_space?(simple_move) && board.empty_space?(double_move)
-        moves << double_move
-      end
-    end
-
-    @color == :black ? diagonal_displacements = [[1,1], [1, -1]] : diagonal_displacements = [[-1, 1], [-1, -1]]
-    diagonal_displacements.each do |displacement|
-      move = displacement.vector_add(@location)
-      moves << move if board.open_space?(move, @color) && !board.empty_space?(move)
-    end
-    moves
-  end
-end
-
-class Board
-  attr_accessor :tiles
-
-  def empty_space?(pos)
-    Board.in_bounds?(pos) && get_tile(pos) == nil
-  end
-
-  def open_space?(pos, color)
-    return false unless Board.in_bounds?(pos)
-    return true if empty_space?(pos)
-    get_tile(pos).color != color
-  end
-
-  def self.in_bounds?(pos)
-    x,y = pos
-    x.between?(0,7) && y.between?(0,7)
-  end
-
-  def initialize
-    @tiles = build_starting_board
-  end
-
-  def build_starting_board
-    board = Array.new(8) {Array.new (8)}
-
-
-    [:white, :black].each do |color|
-      # Do the pawn row
-      color == :white ? row = 6 : row = 1
-      (0..7).each do |column|
-        board[row][column] = Pawn.new([row,column], color)
-      end
-      # Do the first row
-      color == :white ? row = 7 : row = 0
-      [0,7].each do |column|
-        board[row][column] = Rook.new([row, column], color)
-      end
-      [1,6].each do |column|
-        board[row][column] = Knight.new([row,column],color)
-      end
-      [2,5].each do |column|
-        board[row][column] = Bishop.new([row,column],color)
-      end
-      board[row][3] = Queen.new([row,3],color)
-      board[row][4] = King.new([row,4],color)
-    end
-    board
-  end
-
-  def get_tile(pos)
-    row, col = pos
-    @tiles[row][col]
-  end
-
-  def move(old_pos, new_pos, color)
-    raise ArgumentError.new "No piece there!" if get_tile(old_pos).nil?
-    raise ArgumentError.new "Not your color!" if get_tile(old_pos).color != color
-    raise ArgumentError.new "Illegal move" unless get_tile(old_pos).uninhibited_moves(self).include?(new_pos)
-    raise ArgumentError.new "That move puts you in check" unless valid_move?(old_pos, new_pos)
-    perform_move(old_pos, new_pos)
-
-  end
-
-  def perform_move(old_pos, new_pos)
-    x1, y1 = old_pos
-    x2, y2 = new_pos
-    piece = @tiles[x1][y1]
-    @tiles[x2][y2] = piece
-    piece.location = [x2, y2]
-    @tiles[x1][y1] = nil
-  end
-
-  def valid_move?(old_pos,new_pos)
-    duped_board = Marshal.load( Marshal.dump(self) )
-    duped_board.perform_move(old_pos,new_pos)
-    !duped_board.in_check?(get_tile(old_pos).color)
-  end
-
-  def king_location(color)
-    colored_pieces(color).detect {|piece| piece.is_a?(King)}.location
-  end
-
-  def in_check?(color)
-    color == :black ? opp_color = :white : opp_color = :black
-    colored_pieces(opp_color).any? do |piece|
-      piece.uninhibited_moves(self).include?(king_location(color))
-    end
-  end
-
-  def colored_pieces(color)
-    @tiles.flatten.compact.select{|piece| piece.color == color}
-  end
-
-  def in_checkmate?(color)
-    colored_pieces(color).each do |piece|
-      piece.uninhibited_moves(self).each do |move|
-        return false if valid_move?(piece.location, move)
-      end
-    end
-    true
-  end
-
-  def check_pawn_promotion(color)
-    color == :black ? end_row = 7 : end_row = 0
-    colored_pieces(color).detect do |piece|
-      piece.location.first == end_row && piece.is_a?(Pawn)
-    end
-  end
-
-  def promote_pawn(pawn, piece_to_promote)
-    valid_pieces = ["queen", "bishop", "rook", "knight"]
-    x,y = pawn.location
-    color = pawn.color
-    case piece_to_promote
-    when "queen"
-      @tiles[x][y] = Queen.new([x,y], color)
-    when "bishop"
-      @tiles[x][y] = Bishop.new([x,y], color)
-    when "rook"
-      @tiles[x][y] = Rook.new([x,y], color)
-    when "knight"
-      @tiles[x][y] = Knight.new([x,y], color)
-    else
-      raise ArgumentError.new "Not a valid piece"
-    end
   end
 end
 
@@ -329,7 +70,11 @@ class Game
   def get_player_move(current_color)
     begin
       old_pos, new_pos = @player1.get_move
-      @board.move(old_pos, new_pos, current_color)
+      if check_input_is_castle(old_pos,new_pos,current_color)
+        @board.castle_move(old_pos, new_pos, current_color)
+      else
+        @board.move(old_pos, new_pos, current_color)
+      end
     rescue ArgumentError => e
       puts "*********#{e.message}*********"
       retry
@@ -339,6 +84,15 @@ class Game
   def display_outcome(losing_color)
     display
     puts "Game over, #{losing_color} loses!"
+  end
+
+  def check_input_is_castle(king_pos,rook_pos,current_color)
+    piece = board.get_tile(king_pos)
+    if piece.is_a?(King)
+      piece.castle_moves(@board).include?([king_pos, rook_pos])
+    else
+      return false
+    end
   end
 
 end
