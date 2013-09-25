@@ -1,6 +1,5 @@
 # encoding: utf-8
 
-require 'yaml'
 
 class Array
   def vector_add(vector)
@@ -195,10 +194,11 @@ class Board
     @tiles[row][col]
   end
 
-  def move(old_pos, new_pos)
-    #check
-    raise "Illegal move" unless get_tile(old_pos).uninhibited_moves(self).include?(new_pos)
-    raise "That move puts you in check" unless valid_move?(old_pos, new_pos)
+  def move(old_pos, new_pos, color)
+    raise ArgumentError.new "No piece there!" if get_tile(old_pos).nil?
+    raise ArgumentError.new "Not your color!" if get_tile(old_pos).color != color
+    raise ArgumentError.new "Illegal move" unless get_tile(old_pos).uninhibited_moves(self).include?(new_pos)
+    raise ArgumentError.new "That move puts you in check" unless valid_move?(old_pos, new_pos)
     perform_move(old_pos, new_pos)
 
   end
@@ -243,6 +243,7 @@ class Board
   end
 
   def display
+    puts `clear`
     print "    a  b  c  d  e  f  g  h "
     puts ""
     (0..7).each do |x|
@@ -261,19 +262,48 @@ class Board
 end
 
 class Game
-  def initialize
+  def initialize(player1, player2)
+    @player1 = player1
+    @player2 = player2
     @board = Board.new
   end
 
   def play
-    while
+    current_color = :white
+
+    until @board.in_checkmate?(current_color)
       @board.display
-      puts "Enter move in this format: e4 f6"
-      input = gets.scan(/\w+/)
-      old_pos, new_pos = input.map { |algebraic_coords| convert_move(algebraic_coords) }
-      p [old_pos, new_pos]
-      @board.move(old_pos, new_pos)
+      puts "It's #{current_color}'s turn to play"
+      begin
+        old_pos, new_pos = @player1.get_move
+        @board.move(old_pos, new_pos, current_color)
+      rescue ArgumentError => e
+        puts "*********#{e.message}*********"
+        retry
+      end
+      current_color == :white ? current_color = :black : current_color = :white
     end
+
+    display_outcome(current_color)
+  end
+
+  def display_outcome(losing_color)
+    @board.display
+    puts "Game over, #{losing_color} loses!"
+  end
+
+end
+
+class HumanPlayer
+  attr_reader :name
+  def initialize(name)
+    @name = name
+  end
+
+  def get_move
+    puts "Enter move in this format: e4 f6"
+    input = gets.scan(/\w+/)
+    input.map { |algebraic_coords| convert_move(algebraic_coords) }
   end
 
   def convert_move(coords)
@@ -283,11 +313,9 @@ class Game
 end
 
 if __FILE__ == $0
-  game = Game.new
+  game = Game.new(HumanPlayer.new("Player1"), HumanPlayer.new("Player2"))
   game.play
 end
-
-
 
 # board = Board.new
 # board.move([6,5], [5,5])
