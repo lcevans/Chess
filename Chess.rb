@@ -169,7 +169,7 @@ class Board
     [:white, :black].each do |color|
       # Do the pawn row
       color == :white ? row = 6 : row = 1
-      (0..8).each do |column|
+      (0..7).each do |column|
         board[row][column] = Pawn.new([row,column], color)
       end
       # Do the first row
